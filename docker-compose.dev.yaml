@@ -1,0 +1,16 @@
+services:
+    db:
+        extends:
+            file: docker-compose.yaml
+            service: db
+    store:
+        extends:
+            file: docker-compose.yaml
+            service: store
+
+volumes:
+    db:
+    store_data:
+        driver: local
+networks:
+    sgs:

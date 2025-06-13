@@ -1,0 +1,90 @@
+services:
+    store:
+        image: quay.io/minio/minio:latest
+        container_name: sgs-store
+        command: server /data --console-address ":9001"
+        ports:
+            # api port
+            - 9000:9000
+            # console port
+            - 9001:9001
+        volumes:
+            - store_data:/data
+        environment:
+            MINIO_ROOT_USER: ${STORE_USER}
+            MINIO_ROOT_PASSWORD: ${STORE_PASSWORD}
+        healthcheck:
+            test: ["CMD", "mc", "ready", "local"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        networks:
+            - sgs
+    api:
+        container_name: sgs-api
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: api
+        restart: unless-stopped
+        ports:
+            - ${PORT}:${PORT}
+        environment:
+            APP_ENV: ${APP_ENV}
+            PORT: ${PORT}
+            DB_HOST: ${DB_HOST}
+            DB_PORT: ${DB_PORT}
+            DB_DATABASE: ${DB_DATABASE}
+            DB_USERNAME: ${DB_USERNAME}
+            DB_PASSWORD: ${DB_PASSWORD}
+        depends_on:
+            db:
+                condition: service_healthy
+            store:
+                condition: service_healthy
+        networks:
+            - sgs
+    web:
+        container_name: sgs-web
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: web
+        restart: unless-stopped
+        depends_on:
+            - api
+        ports:
+            - 5173:5173
+        networks:
+            - sgs
+    db:
+        image: postgres:latest
+        container_name: sgs-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE}
+            POSTGRES_USER: ${DB_USERNAME}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        ports:
+            - "${DB_PORT}:5432"
+        volumes:
+            - db:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "sh -c 'pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}'",
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 3
+            start_period: 15s
+        networks:
+            - sgs
+
+volumes:
+    db:
+    store_data:
+        driver: local
+networks:
+    sgs:
