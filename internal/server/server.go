@@ -10,20 +10,29 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 
 	"sgs/internal/database"
+	"sgs/internal/store"
 )
 
 type Server struct {
 	port int
 
-	db *database.DB
+	db    *database.DB
+	store *store.Store
 }
 
-func NewServer() *http.Server {
+func NewServer() (*http.Server, error) {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	// connect to store
+	store, err := store.New()
+	if err != nil {
+		return nil, err
+	}
+
 	NewServer := &Server{
 		port: port,
 
-		db: database.New(),
+		db:    database.New(),
+		store: store,
 	}
 
 	// Declare Server config
@@ -35,5 +44,5 @@ func NewServer() *http.Server {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	return server
+	return server, nil
 }

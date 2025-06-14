@@ -10,7 +10,7 @@ import (
 
 type Bucket struct {
 	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type Object struct {
@@ -29,9 +29,9 @@ type User struct {
 	Username string    `json:"username"`
 	// hidden password field during marshaling
 	Password  string    `json:"-"`
-	FullName  *string   `json:"full_name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	FullName  *string   `json:"fullName"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // project models
@@ -39,21 +39,27 @@ type User struct {
 // Project represents a project (bucket abstraction) in our system
 type Project struct {
 	ID        uuid.UUID `json:"id"`
-	OwnerID   uuid.UUID `json:"owner_id"`
+	OwnerID   uuid.UUID `json:"ownerId"`
 	Bucket    string    `json:"bucket"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // File represents a file stored in a project
 type File struct {
-	ID          uuid.UUID `json:"id"`
-	Filename    string    `json:"filename"`
-	ProjectID   uuid.UUID `json:"project_id"`
-	Size        int       `json:"size"`
-	ContentType string    `json:"content_type"`
-	UploadedBy  uuid.UUID `json:"uploaded_by"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID uuid.UUID `json:"id"`
+	// original filename
+	Filename string `json:"filename"`
+	// path to bucket. <project_name-filename>
+	ObjectName  string    `json:"objectName"`
+	ProjectID   uuid.UUID `json:"projectId"`
+	Size        int64     `json:"size"`
+	ContentType string    `json:"contentType"`
+	UploadedBy  uuid.UUID `json:"uploadedBy"`
+	CreatedAt   time.Time `json:"createdAt"`
+
+	// denormalized bucket name
+	Bucket *string `json:"bucket,omitempty"`
 }
 
 // APIKey represents an API key for project access
@@ -61,11 +67,11 @@ type APIKey struct {
 	ID        uuid.UUID  `json:"id"`
 	Token     string     `json:"token"`
 	Name      string     `json:"name"`
-	ProjectID uuid.UUID  `json:"project_id"`
-	UserID    uuid.UUID  `json:"user_id"`
-	ExpiresAt time.Time  `json:"expires_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	ProjectID uuid.UUID  `json:"projectId"`
+	UserID    uuid.UUID  `json:"userId"`
+	ExpiresAt time.Time  `json:"expiresAt"`
+	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
 }
 
 type APIResponse struct {

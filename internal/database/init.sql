@@ -24,14 +24,15 @@ CREATE TABLE IF NOT EXISTS projects(
 CREATE TABLE IF NOT EXISTS files(
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	filename VARCHAR(255) NOT NULL,
+	object_name VARCHAR(1000) NOT NULL,
 	project_id UUID REFERENCES projects(id) NOT NULL,
 	size INTEGER NOT NULL,
 	content_type VARCHAR(255) NOT NULL,
 	uploaded_by UUID REFERENCES users(id) NOT NULL,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-	-- unique filename per project
-	CONSTRAINT unique_project_filename UNIQUE(project_id, filename)
+	-- unique object_name per project
+	UNIQUE(project_id, object_name)
 );
 
 -- create api_keys

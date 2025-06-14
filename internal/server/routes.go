@@ -15,10 +15,21 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// setup repos and handlers
 	userRepo := repository.NewUserRepository(s.db.DB)
+	projectRepo := repository.NewProjectRepository(s.db.DB)
+	fileRepo := repository.NewFileRepository(s.db.DB)
+
 	authHandler := NewAuthHandler(userRepo)
+	projectHandler := NewProjectHandler(projectRepo, s.store)
+	fileHandler := NewFileHandler(fileRepo, projectRepo, s.store)
+
+	// api router
+	r = r.PathPrefix("/api").Subrouter()
+
+	// protected routes
+	protected := r.NewRoute().Subrouter()
+	protected.Use(AuthMiddleware(authHandler))
 
 	// Register routes
-	r = r.PathPrefix("/api").Subrouter()
 	r.HandleFunc("/health", s.healthHandler).Methods(http.MethodGet)
 	r.HandleFunc("/ping", s.PingHandler).Methods(http.MethodGet)
 
@@ -26,9 +37,19 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.HandleFunc("/auth/register", authHandler.Register).Methods(http.MethodPost)
 	r.HandleFunc("/auth/login", authHandler.Login).Methods(http.MethodPost)
 
-	// protected routes
-	protected := r.NewRoute().Subrouter()
-	protected.Use(AuthMiddleware(authHandler))
+	// project routes
+	protected.HandleFunc("/projects", projectHandler.CreateProject).Methods(http.MethodPost)
+	protected.HandleFunc("/projects", projectHandler.GetUserProjects).Methods(http.MethodGet)
+	protected.HandleFunc("/projects/{id}", projectHandler.DeleteProject).Methods(http.MethodDelete)
+	// nested file routes for projects
+	protected.HandleFunc("/projects/{id}/files", fileHandler.UploadFile).Methods(http.MethodPost)
+	protected.HandleFunc("/projects/{id}/files/meta", fileHandler.GetProjectFilesMeta).Methods(http.MethodGet)
+
+	// files
+	protected.HandleFunc("/files/me", fileHandler.GetUserFilesMeta).Methods(http.MethodGet)
+	protected.HandleFunc("/files/{id}", fileHandler.GetFileMeta).Methods(http.MethodGet)
+	protected.HandleFunc("/files/{id}", fileHandler.DeleteFile).Methods(http.MethodDelete)
+	protected.HandleFunc("/files/{id}/download", fileHandler.DownloadFileHandler).Methods(http.MethodGet)
 
 	// Wrap the router with CORS middleware
 	return s.corsMiddleware(r)

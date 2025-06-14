@@ -43,7 +43,7 @@ func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
 type RegisterRequest struct {
 	Username string  `json:"username"`
 	Password string  `json:"password"`
-	FullName *string `json:"full_name,omitempty"`
+	FullName *string `json:"fullName,omitempty"`
 }
 
 // validate register request
@@ -163,7 +163,7 @@ func (s *AuthHandler) generateAccessToken(user *models.User, ttl time.Duration) 
 	expiresAt := time.Now().Add(ttl)
 	claims := jwt.MapClaims{
 		"sub":      user.ID.String(),
-		"username": user.UpdatedAt,
+		"username": user.Username,
 		"exp":      expiresAt.Unix(),
 		"iat":      time.Now().Unix(),
 	}
@@ -187,13 +187,13 @@ func (s *AuthHandler) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
-		return JwtSecret, nil
+		return []byte(JwtSecret), nil
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
 			return nil, ErrExpiredToken
 		}
-		return nil, ErrInvalidToken
+		return nil, err
 	}
 
 	// extract and validate claims

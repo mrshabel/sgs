@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sgs/internal/models"
 	"strings"
@@ -40,6 +41,7 @@ func AuthMiddleware(s *AuthHandler) func(http.Handler) http.Handler {
 			// validate the token
 			claims, err := s.ValidateToken(tokenString)
 			if err != nil {
+				log.Printf("Invalid jwt token: %v\n", err)
 				s.sendResponse(w, http.StatusUnauthorized, models.APIResponse{Message: "Invalid or expired token"})
 				return
 			}
@@ -47,6 +49,7 @@ func AuthMiddleware(s *AuthHandler) func(http.Handler) http.Handler {
 			// extract user ID from claims
 			userIDStr, ok := claims["sub"].(string)
 			if !ok {
+				log.Printf("Invalid jwt token claims. Token is malformed: %v\n", claims)
 				s.sendResponse(w, http.StatusUnauthorized, models.APIResponse{Message: "Invalid token claims"})
 				return
 			}

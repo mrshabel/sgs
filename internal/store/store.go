@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"io"
+	"log"
 	"os"
 	"sgs/internal/models"
 
@@ -16,7 +17,7 @@ const (
 
 // configs
 var (
-	endpoint        = ""
+	endpoint        = os.Getenv("STORE_ADDR")
 	accessKeyID     = os.Getenv("STORE_USER")
 	secretAccessKey = os.Getenv("STORE_PASSWORD")
 	useSSL          = false
@@ -35,6 +36,7 @@ func New() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("store connected successfully")
 	return &Store{client: client}, nil
 }
 
@@ -75,30 +77,24 @@ func (s *Store) RemoveBucket(ctx context.Context, name string) error {
 
 // object operations
 
-// GetObject retrieves an object from the specified bucket and streams it into the provided temp file
-func (s *Store) GetObject(ctx context.Context, bucketName, objectName string, tempFile *os.File) error {
+// GetObject retrieves an object from the specified bucket and streams it into the provided io Writer
+func (s *Store) GetObject(ctx context.Context, bucketName, objectName string, writer io.Writer) error {
 	object, err := s.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
 	if err != nil {
 		return err
 	}
 	defer object.Close()
 
-	// stream object into local file
-	if _, err = io.Copy(tempFile, object); err != nil {
+	// stream object into the writer
+	if _, err = io.Copy(writer, object); err != nil {
 		return err
 	}
 	return nil
 }
 
-// CreateObject creates a new object and stream the content of the file into the object
-func (s *Store) CreateObject(ctx context.Context, bucketName, objectName, contentType string, tempFile *os.File) (models.Object, error) {
-	// get file stat
-	fileStat, err := tempFile.Stat()
-	if err != nil {
-		return models.Object{}, err
-	}
-
-	info, err := s.client.PutObject(ctx, bucketName, objectName, tempFile, fileStat.Size(), minio.PutObjectOptions{ContentType: contentType})
+// CreateObject creates a new object and stream the content of the file read into the object
+func (s *Store) CreateObject(ctx context.Context, bucketName, objectName, contentType string, size int64, fileReader io.Reader) (models.Object, error) {
+	info, err := s.client.PutObject(ctx, bucketName, objectName, fileReader, size, minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {
 		return models.Object{}, err
 	}
