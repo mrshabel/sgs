@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"sgs/internal/models"
+	"sgs/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -45,11 +46,12 @@ func (r *ProjectRepository) CreateProject(ctx context.Context, tx *sql.Tx, owner
 	return &project, nil
 }
 
-// GetProjectByProjectByBucket retrieves a project by their email address. [ErrProjectNotFound] is returned when the associated project does not exist
-func (r *ProjectRepository) GetProjectByProjectByBucket(ctx context.Context, bucket string) (*models.Project, error) {
+// GetProjectByBucket retrieves a project by their email address. [ErrProjectNotFound] is returned when the associated project does not exist
+func (r *ProjectRepository) GetProjectByBucket(ctx context.Context, bucket string) (*models.Project, error) {
 	query := `
 		SELECT id, owner_id, bucket, created_at, updated_at
 		FROM projects WHERE bucket = $1
+		ORDER BY updated_at DESC
 		`
 	var project models.Project
 	err := r.db.QueryRowContext(ctx, query, bucket).Scan(
@@ -114,29 +116,49 @@ func (r *ProjectRepository) GetProjectByIDTx(ctx context.Context, tx *sql.Tx, id
 	return &project, nil
 }
 
-// GetProjectsByOwnerID retrieves all projects by their OwnerID. [ErrProjectNotFound] is returned when the associated project does not exist
+// GetProjectsByOwnerID retrieves all projects by their OwnerID. [ErrProjectNotFound] is returned when the associated project does not exist. The total files in the project is returned as part of the output data
 func (r *ProjectRepository) GetProjectsByOwnerID(ctx context.Context, ownerID uuid.UUID) ([]*models.Project, error) {
 	query := `
-		SELECT id, owner_id, bucket, created_at, updated_at
-		FROM projects WHERE owner_id = $1
+		WITH cte AS (
+            SELECT project_id, COUNT(*) AS file_count, SUM(size) AS total_size
+            FROM files
+            WHERE uploaded_by = $1
+            GROUP BY project_id
+        )
+        SELECT
+            p.id,
+            p.owner_id,
+            p.bucket,
+            p.created_at,
+            p.updated_at,
+            COALESCE(fc.file_count, 0) AS file_count,
+            COALESCE(fc.total_size, 0) AS total_size
+        FROM projects p
+        LEFT JOIN cte fc ON fc.project_id = p.id
+        WHERE p.owner_id = $1
+        ORDER BY p.updated_at DESC
 		`
-
 	rows, err := r.db.QueryContext(ctx, query, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	projects := []*models.Project{}
-
 	for rows.Next() {
 		var project models.Project
+		// convert parse total size
+		var totalSize int64
 		if err := rows.Scan(
 			&project.ID,
 			&project.OwnerID,
 			&project.Bucket,
 			&project.CreatedAt,
-			&project.UpdatedAt); err != nil {
+			&project.UpdatedAt,
+			&project.FileCount,
+			&totalSize,
+		); err != nil {
 			return nil, err
 		}
+		project.TotalFileSize = utils.FormatStorageSize(totalSize)
 		projects = append(projects, &project)
 	}
 	return projects, nil

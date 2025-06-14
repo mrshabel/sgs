@@ -17,10 +17,12 @@ func (s *Server) RegisterRoutes() http.Handler {
 	userRepo := repository.NewUserRepository(s.db.DB)
 	projectRepo := repository.NewProjectRepository(s.db.DB)
 	fileRepo := repository.NewFileRepository(s.db.DB)
+	dashboardRepo := repository.NewDashboardRepository(s.db.DB)
 
 	authHandler := NewAuthHandler(userRepo)
 	projectHandler := NewProjectHandler(projectRepo, s.store)
 	fileHandler := NewFileHandler(fileRepo, projectRepo, s.store)
+	dashboardHandler := NewDashboardHandler(dashboardRepo)
 
 	// api router
 	r = r.PathPrefix("/api").Subrouter()
@@ -40,6 +42,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// project routes
 	protected.HandleFunc("/projects", projectHandler.CreateProject).Methods(http.MethodPost)
 	protected.HandleFunc("/projects", projectHandler.GetUserProjects).Methods(http.MethodGet)
+	protected.HandleFunc("/projects/{id}", projectHandler.GetProject).Methods(http.MethodGet)
 	protected.HandleFunc("/projects/{id}", projectHandler.DeleteProject).Methods(http.MethodDelete)
 	// nested file routes for projects
 	protected.HandleFunc("/projects/{id}/files", fileHandler.UploadFile).Methods(http.MethodPost)
@@ -50,6 +53,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	protected.HandleFunc("/files/{id}", fileHandler.GetFileMeta).Methods(http.MethodGet)
 	protected.HandleFunc("/files/{id}", fileHandler.DeleteFile).Methods(http.MethodDelete)
 	protected.HandleFunc("/files/{id}/download", fileHandler.DownloadFileHandler).Methods(http.MethodGet)
+
+	// dashboard stats
+	protected.HandleFunc("/dashboard/stats", dashboardHandler.GetDashboardStats).Methods(http.MethodGet)
 
 	// Wrap the router with CORS middleware
 	return s.corsMiddleware(r)

@@ -64,6 +64,7 @@ func (r *FileRepository) GetFileByID(ctx context.Context, id uuid.UUID) (*models
 		JOIN projects
 		ON files.project_id = projects.id
 		WHERE files.id = $1
+		ORDER BY files.created_at DESC
 		`
 	var file models.File
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -134,6 +135,7 @@ func (r *FileRepository) GetFiles(ctx context.Context, projectId *uuid.UUID) ([]
 	if projectId != nil {
 		query += `WHERE project_id = $1`
 	}
+	query += ` ORDER BY created_at DESC`
 	// check if filter is enabled
 	files := []*models.File{}
 	rows, err := r.db.QueryContext(ctx, query, &projectId)
@@ -164,6 +166,7 @@ func (r *FileRepository) GetFilesByOwnerID(ctx context.Context, ownerID uuid.UUI
 		SELECT id, filename, object_name, project_id, size, content_type, uploaded_by, created_at
 		FROM files
 		WHERE uploaded_by = $1
+		ORDER BY created_at DESC
 		`
 
 	// check if filter is enabled

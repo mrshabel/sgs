@@ -103,6 +103,25 @@ func (s *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	s.sendResponse(w, http.StatusCreated, models.APIResponse{Message: "Project created successfully", Data: project})
 }
 
+// GetProject retrieves a single project
+func (s *ProjectHandler) GetProject(w http.ResponseWriter, r *http.Request) {
+	// get the project id
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		s.sendResponse(w, http.StatusUnprocessableEntity, models.APIResponse{Message: "Invalid project ID"})
+		return
+	}
+
+	project, err := s.projectRepo.GetProjectByID(r.Context(), id)
+	if err != nil {
+		log.Printf("failed to retrieve project: %v\n", err)
+		s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: err.Error()})
+		return
+	}
+
+	s.sendResponse(w, http.StatusOK, models.APIResponse{Message: "Project retrieved successfully", Data: project})
+}
+
 // GetUserProjects retrieves projects belonging to a user
 func (s *ProjectHandler) GetUserProjects(w http.ResponseWriter, r *http.Request) {
 	// get user id
@@ -119,7 +138,7 @@ func (s *ProjectHandler) GetUserProjects(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	s.sendResponse(w, http.StatusOK, models.APIResponse{Message: "Project retrieved successfully", Data: projects})
+	s.sendResponse(w, http.StatusOK, models.APIResponse{Message: "Projects retrieved successfully", Data: projects})
 }
 
 // DeleteProject delete a project

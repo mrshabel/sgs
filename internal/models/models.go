@@ -43,6 +43,10 @@ type Project struct {
 	Bucket    string    `json:"bucket"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	// denormalized file count
+	FileCount     int64  `json:"fileCount,omitempty"`
+	TotalFileSize string `json:"totalFileSize,omitempty"`
 }
 
 // File represents a file stored in a project
@@ -72,6 +76,17 @@ type APIKey struct {
 	ExpiresAt time.Time  `json:"expiresAt"`
 	RevokedAt *time.Time `json:"revokedAt,omitempty"`
 	CreatedAt time.Time  `json:"createdAt"`
+}
+
+// DashboardStats represents a summary of the dashboard data
+type DashboardStats struct {
+	OwnerID       uuid.UUID `json:"ownerId"`
+	TotalProjects string    `json:"totalProjects"`
+	TotalFiles    string    `json:"totalFiles"`
+	TotalSize     int64     `json:"totalSize"`
+	ActiveAPIKeys int64     `json:"activeAPIKeys"`
+	// formatted version of the storage used in bytes, Kb, Mb
+	StorageUsed string `json:"storageUsed"`
 }
 
 type APIResponse struct {
