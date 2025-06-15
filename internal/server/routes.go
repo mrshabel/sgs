@@ -18,11 +18,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 	projectRepo := repository.NewProjectRepository(s.db.DB)
 	fileRepo := repository.NewFileRepository(s.db.DB)
 	dashboardRepo := repository.NewDashboardRepository(s.db.DB)
+	apiKeyRepo := repository.NewAPIKeyRepository(s.db.DB)
 
-	authHandler := NewAuthHandler(userRepo)
+	authHandler := NewAuthHandler(userRepo, apiKeyRepo)
 	projectHandler := NewProjectHandler(projectRepo, s.store)
 	fileHandler := NewFileHandler(fileRepo, projectRepo, s.store)
 	dashboardHandler := NewDashboardHandler(dashboardRepo)
+	apiKeyHandler := NewAPIKeyHandler(apiKeyRepo)
 
 	// api router
 	r = r.PathPrefix("/api").Subrouter()
@@ -47,6 +49,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// nested file routes for projects
 	protected.HandleFunc("/projects/{id}/files", fileHandler.UploadFile).Methods(http.MethodPost)
 	protected.HandleFunc("/projects/{id}/files/meta", fileHandler.GetProjectFilesMeta).Methods(http.MethodGet)
+	// nested routes for api keys
+	protected.HandleFunc("/projects/{id}/api-keys", apiKeyHandler.CreateAPIKey).Methods(http.MethodPost)
+	protected.HandleFunc("/projects/{id}/api-keys", apiKeyHandler.GetProjectAPIKeys).Methods(http.MethodGet)
 
 	// files
 	protected.HandleFunc("/files/me", fileHandler.GetUserFilesMeta).Methods(http.MethodGet)
@@ -57,7 +62,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// dashboard stats
 	protected.HandleFunc("/dashboard/stats", dashboardHandler.GetDashboardStats).Methods(http.MethodGet)
 
+	// api key routes
+	protected.HandleFunc("/api-keys/me", apiKeyHandler.GetUserAPIKeys).Methods(http.MethodGet)
+	protected.HandleFunc("/api-keys/{id}", apiKeyHandler.GetAPIKey).Methods(http.MethodGet)
+	protected.HandleFunc("/api-keys/{id}", apiKeyHandler.DeleteAPIKey).Methods(http.MethodDelete)
+	protected.HandleFunc("/api-keys/{id}/revoke", apiKeyHandler.RevokeAPIKey).Methods(http.MethodPatch)
+
 	// Wrap the router with CORS middleware
+
 	return s.corsMiddleware(r)
 }
 

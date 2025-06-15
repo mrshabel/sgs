@@ -250,7 +250,7 @@ export default function ProjectDetailPage() {
                                             Created{" "}
                                             {new Date(
                                                 project.createdAt
-                                            ).toLocaleDateString()}
+                                            ).toUTCString()}
                                         </p>
                                     </div>
                                 </div>
@@ -480,7 +480,7 @@ export default function ProjectDetailPage() {
                                                     <TableCell className="text-muted-foreground">
                                                         {new Date(
                                                             file.createdAt
-                                                        ).toLocaleTimeString()}
+                                                        ).toUTCString()}
                                                     </TableCell>
                                                     <TableCell>
                                                         <DropdownMenu>

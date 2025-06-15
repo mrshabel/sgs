@@ -40,11 +40,15 @@ CREATE TABLE IF NOT EXISTS api_keys(
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	token VARCHAR(255) UNIQUE NOT NULL,
 	name VARCHAR(255) NOT NULL,
-	project_id UUID REFERENCES projects(id) NOT NULL,
+	-- delete all api keys when project is deleted
+	project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
 	user_id UUID REFERENCES users(id) NOT NULL,
 	expires_at TIMESTAMPTZ NOT NULL,
 	revoked_at TIMESTAMPTZ,
-	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+	-- unique name per project
+	UNIQUE(name, project_id)
 );
 
 

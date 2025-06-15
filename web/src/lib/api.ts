@@ -169,7 +169,7 @@ class APIClient {
         data: Partial<CreateProjectRequest>
     ): Promise<APIResponse<Project>> {
         try {
-            const response = await this.client.put(
+            const response = await this.client.patch(
                 `/projects/${projectId}`,
                 data
             );
@@ -312,7 +312,7 @@ class APIClient {
         data: { filename?: string }
     ): Promise<APIResponse<File>> {
         try {
-            const response = await this.client.put(`/files/${fileId}`, data);
+            const response = await this.client.patch(`/files/${fileId}`, data);
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to update file metadata");
@@ -354,7 +354,7 @@ class APIClient {
     // API Key endpoints
     async getAPIKeys(): Promise<APIResponse<APIKey[]>> {
         try {
-            const response = await this.client.get("/api-keys");
+            const response = await this.client.get("/api-keys/me");
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to fetch API keys");
@@ -371,10 +371,14 @@ class APIClient {
     }
 
     async createAPIKey(
+        projectId: string,
         data: CreateAPIKeyRequest
     ): Promise<APIResponse<APIKey & { token: string }>> {
         try {
-            const response = await this.client.post("/api-keys", data);
+            const response = await this.client.post(
+                `projects/${projectId}/api-keys`,
+                data
+            );
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to create API key");
@@ -386,7 +390,10 @@ class APIClient {
         data: { name?: string }
     ): Promise<APIResponse<APIKey>> {
         try {
-            const response = await this.client.put(`/api-keys/${keyId}`, data);
+            const response = await this.client.patch(
+                `/api-keys/${keyId}`,
+                data
+            );
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to update API key");
@@ -395,7 +402,7 @@ class APIClient {
 
     async revokeAPIKey(keyId: string): Promise<APIResponse<void>> {
         try {
-            const response = await this.client.post(
+            const response = await this.client.patch(
                 `/api-keys/${keyId}/revoke`
             );
             return response.data;

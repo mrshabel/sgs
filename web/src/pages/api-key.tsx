@@ -36,6 +36,7 @@ import {
     AlertTriangle,
     CheckCircle,
     XCircle,
+    Database,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -76,7 +77,7 @@ export default function APIKeysPage() {
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.info("Copied to clipboard", {
+        toast.success("Copied to clipboard", {
             description: "API key has been copied to your clipboard.",
         });
     };
@@ -94,7 +95,9 @@ export default function APIKeysPage() {
                 )
             );
 
-            toast.success("API key revoked");
+            toast.success("API key revoked", {
+                description: "The API key has been successfully revoked.",
+            });
         } catch (error) {
             const errorMessage =
                 error instanceof Error
@@ -118,7 +121,7 @@ export default function APIKeysPage() {
                 label: "Revoked",
                 variant: "destructive" as const,
                 icon: XCircle,
-                color: "text-red-500",
+                color: "text-gray-200",
             };
         if (isExpired(key.expiresAt))
             return {
@@ -146,10 +149,31 @@ export default function APIKeysPage() {
         (key) => isRevoked(key.revokedAt) || isExpired(key.expiresAt)
     );
 
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="relative inline-flex items-center justify-center w-16 h-16 mb-4">
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/70 rounded-full blur-sm opacity-75 animate-pulse" />
+                        <div className="relative bg-gradient-to-r from-primary to-primary/70 p-3 rounded-full shadow-lg">
+                            <Database className="h-6 w-6 text-white animate-spin" />
+                        </div>
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+                        Loading API Keys
+                    </h2>
+                    <p className="text-slate-600 dark:text-slate-400">
+                        Please wait while we fetch your API keys...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
             {/* Header */}
-            <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 border-b border-white/20 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:border-slate-800/50 dark:bg-slate-950/80">
                 <div className="container mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center space-x-4">
@@ -166,19 +190,24 @@ export default function APIKeysPage() {
                             </Button>
                             <div className="flex items-center space-x-3">
                                 <div className="relative">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/70 rounded-lg blur-sm opacity-75" />
-                                    <div className="relative bg-gradient-to-r from-primary to-primary/70 p-2 rounded-lg">
+                                    <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-primary to-primary/70 opacity-75 blur-sm" />
+                                    <div className="relative bg-gradient-to-r from-primary to-primary/70 p-2 rounded-xl shadow-lg">
                                         <Key className="h-5 w-5 text-white" />
                                     </div>
                                 </div>
-                                <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                                    API Keys
-                                </h1>
+                                <div>
+                                    <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent dark:from-white dark:to-slate-300">
+                                        API Keys
+                                    </h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Manage programmatic access
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         <Button
                             onClick={() => setShowCreateModal(true)}
-                            className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-primary/90"
+                            className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             Generate New Key
@@ -196,55 +225,90 @@ export default function APIKeysPage() {
                             value: apiKeys.length,
                             description: "All API keys",
                             icon: Key,
-                            gradient: "from-blue-500 to-cyan-500",
-                            change: "+1 this month",
+                            gradient:
+                                "from-violet-500 via-purple-500 to-indigo-600",
+                            bgGradient:
+                                "from-violet-500/10 via-purple-500/5 to-indigo-500/10",
+                            iconBg: "from-violet-500 to-purple-600",
+                            change: `${apiKeys.length > 0 ? "+" : ""}${
+                                apiKeys.length
+                            } total`,
                         },
                         {
                             title: "Active Keys",
                             value: activeKeys.length,
                             description: "Currently active",
                             icon: Activity,
-                            gradient: "from-green-500 to-emerald-500",
-                            change: "All healthy",
+                            gradient:
+                                "from-emerald-500 via-teal-500 to-cyan-600",
+                            bgGradient:
+                                "from-emerald-500/10 via-teal-500/5 to-cyan-500/10",
+                            iconBg: "from-emerald-500 to-teal-600",
+                            change:
+                                activeKeys.length > 0
+                                    ? "All healthy"
+                                    : "No active keys",
                         },
                         {
                             title: "Expired/Revoked",
                             value: expiredRevokedKeys.length,
                             description: "Inactive keys",
                             icon: AlertTriangle,
-                            gradient: "from-orange-500 to-red-500",
-                            change: "2 need attention",
+                            gradient:
+                                "from-orange-500 via-amber-500 to-yellow-600",
+                            bgGradient:
+                                "from-orange-500/10 via-amber-500/5 to-yellow-500/10",
+                            iconBg: "from-orange-500 to-amber-600",
+                            change:
+                                expiredRevokedKeys.length > 0
+                                    ? "Need attention"
+                                    : "All good",
                         },
                     ].map((stat, index) => (
                         <Card
                             key={index}
-                            className="relative overflow-hidden border-0 bg-background/50 backdrop-blur-sm hover:bg-background/80 transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                            className="group relative overflow-hidden border-0 bg-white/70 backdrop-blur-xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] dark:bg-slate-900/70"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            {/* Background Gradient */}
+                            <div
+                                className={`absolute inset-0 bg-gradient-to-br ${stat.bgGradient} opacity-60`}
+                            />
 
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    {stat.title}
-                                </CardTitle>
-                                <div
-                                    className={`p-2 rounded-lg bg-gradient-to-r ${stat.gradient} shadow-lg`}
-                                >
-                                    <stat.icon className="h-4 w-4 text-white" />
-                                </div>
-                            </CardHeader>
+                            {/* Animated Border */}
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                            <CardContent className="relative">
-                                <div className="text-2xl font-bold mb-1">
-                                    {stat.value}
+                            <CardContent className="relative p-6">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div
+                                        className={`p-3 rounded-2xl bg-gradient-to-r ${stat.iconBg} shadow-lg`}
+                                    >
+                                        <stat.icon className="h-6 w-6 text-white" />
+                                    </div>
+                                    <div
+                                        className={`px-2 py-1 rounded-full bg-gradient-to-r ${stat.gradient} opacity-20`}
+                                    >
+                                        <Sparkles className="h-3 w-3 text-transparent" />
+                                    </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground mb-2">
-                                    {stat.description}
-                                </p>
-                                <div className="flex items-center text-xs">
-                                    <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                                    <span className="text-green-500 font-medium">
-                                        {stat.change}
-                                    </span>
+
+                                <div className="space-y-2">
+                                    <h3 className="text-3xl font-bold text-slate-900 dark:text-white">
+                                        {stat.value}
+                                    </h3>
+                                    <div className="space-y-1">
+                                        <p className="text-lg font-semibold text-slate-700 dark:text-slate-300">
+                                            {stat.title}
+                                        </p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            {stat.description}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center text-xs pt-2">
+                                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                                        <span className="text-green-500 font-medium">
+                                            {stat.change}
+                                        </span>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -252,7 +316,7 @@ export default function APIKeysPage() {
                 </div>
 
                 {/* API Keys Table */}
-                <Card className="border-0 shadow-2xl bg-background/80 backdrop-blur-xl relative overflow-hidden">
+                <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden dark:bg-slate-900/80">
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 opacity-30" />
 
                     <CardHeader className="relative">
@@ -267,49 +331,38 @@ export default function APIKeysPage() {
                     </CardHeader>
 
                     <CardContent className="relative">
-                        {isLoading ? (
-                            <div className="space-y-4">
-                                {[...Array(5)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="flex items-center space-x-4 animate-pulse p-4 rounded-lg bg-muted/20"
-                                    >
-                                        <div className="h-4 bg-muted rounded w-32"></div>
-                                        <div className="h-4 bg-muted rounded w-48"></div>
-                                        <div className="h-4 bg-muted rounded w-24"></div>
-                                        <div className="h-4 bg-muted rounded w-32"></div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : apiKeys.length === 0 ? (
+                        {apiKeys.length === 0 ? (
                             <div className="text-center py-16">
                                 <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 mb-6">
                                     <Key className="h-10 w-10 text-primary" />
                                     <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
                                 </div>
-                                <h3 className="text-2xl font-semibold mb-2">
+                                <h3 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">
                                     No API keys yet
                                 </h3>
-                                <p className="text-muted-foreground text-lg mb-6 max-w-md mx-auto">
+                                <p className="text-slate-600 dark:text-slate-400 text-lg mb-6 max-w-md mx-auto">
                                     Generate your first API key to access the
                                     SGS API programmatically
                                 </p>
                                 <Button
                                     onClick={() => setShowCreateModal(true)}
                                     size="lg"
-                                    className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                    className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-primary/90"
                                 >
                                     <Sparkles className="h-5 w-5 mr-2" />
                                     Generate API Key
                                 </Button>
                             </div>
                         ) : (
-                            <div className="rounded-lg border border-muted-foreground/10 overflow-hidden">
+                            <div className="rounded-lg border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-muted/30 hover:bg-muted/50">
+                                        <TableRow className="bg-slate-50/50 hover:bg-slate-100/50 dark:bg-slate-800/50 dark:hover:bg-slate-700/50">
                                             <TableHead className="font-semibold">
                                                 Name
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Project
                                             </TableHead>
                                             <TableHead className="font-semibold">
                                                 Token
@@ -332,7 +385,7 @@ export default function APIKeysPage() {
                                             return (
                                                 <TableRow
                                                     key={key.id}
-                                                    className="hover:bg-muted/30 transition-all duration-200 group"
+                                                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all duration-200 group"
                                                     style={{
                                                         animationDelay: `${
                                                             index * 50
@@ -347,9 +400,15 @@ export default function APIKeysPage() {
                                                             </span>
                                                         </div>
                                                     </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        <span className="group-hover:text-primary transition-colors">
+                                                            {key.projectBucket ??
+                                                                "N/A"}
+                                                        </span>
+                                                    </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center space-x-2">
-                                                            <code className="text-sm bg-muted/50 px-3 py-1 rounded-md font-mono border">
+                                                            <code className="text-sm bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md font-mono border border-slate-200 dark:border-slate-700">
                                                                 {key.token.substring(
                                                                     0,
                                                                     16
@@ -385,16 +444,16 @@ export default function APIKeysPage() {
                                                     </TableCell>
                                                     <TableCell className="font-mono text-sm">
                                                         <div className="flex items-center gap-2">
-                                                            <Clock className="h-3 w-3 text-muted-foreground" />
+                                                            <Clock className="h-3 w-3 text-slate-500 dark:text-slate-400" />
                                                             {new Date(
                                                                 key.expiresAt
-                                                            ).toLocaleDateString()}
+                                                            ).toUTCString()}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-muted-foreground">
+                                                    <TableCell className="text-slate-600 dark:text-slate-400">
                                                         {new Date(
                                                             key.createdAt
-                                                        ).toLocaleDateString()}
+                                                        ).toUTCString()}
                                                     </TableCell>
                                                     <TableCell>
                                                         <DropdownMenu>

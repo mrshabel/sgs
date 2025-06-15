@@ -3,10 +3,16 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sgs/internal/models"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+// errors
+var (
+	ErrAPIKeyNotFound = errors.New("api key not found")
 )
 
 // APIKeyRepository handles database operations for key
@@ -24,18 +30,18 @@ func (r *APIKeyRepository) CreateAPIKey(ctx context.Context, token, name string,
 	var key models.APIKey
 	query := `
         INSERT INTO api_keys(token, name, project_id, user_id, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, token, name, project_id, user_id, expires_at, created_at
+        VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, token, name, project_id, user_id, expires_at, revoked_at, created_at
     `
 	var revokedAt sql.NullTime
-	if err := r.db.QueryRowContext(ctx, query, token, name, projectID, UserID, expiresAt, revokedAt).Scan(
+	if err := r.db.QueryRowContext(ctx, query, token, name, projectID, UserID, expiresAt).Scan(
 		&key.ID,
 		&key.Token,
 		&key.Name,
 		&key.ProjectID,
 		&key.UserID,
 		&key.ExpiresAt,
-		revokedAt,
+		&revokedAt,
 		&key.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -47,11 +53,14 @@ func (r *APIKeyRepository) CreateAPIKey(ctx context.Context, token, name string,
 	return &key, nil
 }
 
-// GetAPIKeyByToken retrieves an API key by its ID
+// GetAPIKeyByToken retrieves an API key by its ID. [ErrAPIKeyNotFound] is returned when the api key is not found
 func (r *APIKeyRepository) GetAPIKeyByToken(ctx context.Context, token string) (*models.APIKey, error) {
 	query := `
-        SELECT id, token, name, project_id, user_id, expires_at, revoked_at, created_at
-        FROM api_keys WHERE token = $1
+        SELECT ak.id, ak.token, ak.name, ak.project_id, ak.user_id, ak.expires_at, ak.revoked_at, ak.created_at, p.bucket
+        FROM api_keys ak
+		LEFT JOIN projects p
+		ON ak.project_id = p.id
+		WHERE ak.token = $1
     `
 	var key models.APIKey
 	var revokedAt sql.NullTime
@@ -65,8 +74,12 @@ func (r *APIKeyRepository) GetAPIKeyByToken(ctx context.Context, token string) (
 		&key.ExpiresAt,
 		&revokedAt,
 		&key.CreatedAt,
+		&key.ProjectBucket,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrAPIKeyNotFound
+		}
 		return nil, err
 	}
 
@@ -77,11 +90,14 @@ func (r *APIKeyRepository) GetAPIKeyByToken(ctx context.Context, token string) (
 	return &key, nil
 }
 
-// GetAPIKeyByID retrieves an API key by its ID
+// GetAPIKeyByID retrieves an API key by its ID. [ErrAPIKeyNotFound] is returned when the api key is not found
 func (r *APIKeyRepository) GetAPIKeyByID(ctx context.Context, id uuid.UUID) (*models.APIKey, error) {
 	query := `
-        SELECT id, token, name, project_id, user_id, expires_at, revoked_at, created_at
-        FROM api_keys WHERE id = $1
+        SELECT ak.id, ak.token, ak.name, ak.project_id, ak.user_id, ak.expires_at, ak.revoked_at, ak.created_at, p.bucket
+        FROM api_keys ak
+		LEFT JOIN projects p
+		ON ak.project_id = p.id
+		WHERE ak.id = $1
     `
 	var key models.APIKey
 	var revokedAt sql.NullTime
@@ -95,8 +111,12 @@ func (r *APIKeyRepository) GetAPIKeyByID(ctx context.Context, id uuid.UUID) (*mo
 		&key.ExpiresAt,
 		&revokedAt,
 		&key.CreatedAt,
+		&key.ProjectBucket,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrFileNotFound
+		}
 		return nil, err
 	}
 
@@ -108,14 +128,15 @@ func (r *APIKeyRepository) GetAPIKeyByID(ctx context.Context, id uuid.UUID) (*mo
 }
 
 // GetAPIKeys retrieves all API keys for a project
-func (r *APIKeyRepository) GetAPIKeysByProjectID(ctx context.Context, projectID uuid.UUID) ([]*models.APIKey, error) {
+func (r *APIKeyRepository) GetAPIKeysByProjectID(ctx context.Context, projectID, userID uuid.UUID) ([]*models.APIKey, error) {
 	query := `
         SELECT id, token, name, project_id, user_id, expires_at, revoked_at, created_at
         FROM api_keys
-		WHERE project_id = $1
+		WHERE project_id = $1 AND user_id = $2
+		ORDER BY created_at DESC
     `
 
-	rows, err := r.db.QueryContext(ctx, query, projectID)
+	rows, err := r.db.QueryContext(ctx, query, projectID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +173,12 @@ func (r *APIKeyRepository) GetAPIKeysByProjectID(ctx context.Context, projectID 
 // GetAPIKeysByUserID retrieves all API keys for a user
 func (r *APIKeyRepository) GetAPIKeysByUserID(ctx context.Context, userID uuid.UUID) ([]*models.APIKey, error) {
 	query := `
-        SELECT id, token, name, project_id, user_id, expires_at, revoked_at, created_at
-        FROM api_keys
-        WHERE user_id = $1
+        SELECT ak.id, ak.token, ak.name, ak.project_id, ak.user_id, ak.expires_at, ak.revoked_at, ak.created_at, p.bucket
+        FROM api_keys ak
+		LEFT JOIN projects p
+		ON ak.project_id = p.id
+        WHERE ak.user_id = $1
+		ORDER BY ak.created_at DESC
     `
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -176,6 +200,7 @@ func (r *APIKeyRepository) GetAPIKeysByUserID(ctx context.Context, userID uuid.U
 			&key.ExpiresAt,
 			&revokedAt,
 			&key.CreatedAt,
+			&key.ProjectBucket,
 		); err != nil {
 			return nil, err
 		}
@@ -191,13 +216,13 @@ func (r *APIKeyRepository) GetAPIKeysByUserID(ctx context.Context, userID uuid.U
 }
 
 // RevokeAPIKey revokes an API key by setting its revoked_at timestamp
-func (r *APIKeyRepository) RevokeAPIKey(ctx context.Context, id uuid.UUID) error {
+func (r *APIKeyRepository) RevokeAPIKey(ctx context.Context, id, userID uuid.UUID) error {
 	query := `
         UPDATE api_keys
         SET revoked_at = NOW()
-        WHERE id = $1 AND revoked_at IS NULL
+        WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
     `
-	result, err := r.db.ExecContext(ctx, query, id)
+	result, err := r.db.ExecContext(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -214,12 +239,12 @@ func (r *APIKeyRepository) RevokeAPIKey(ctx context.Context, id uuid.UUID) error
 }
 
 // DeleteAPIKey permanently deletes an API key
-func (r *APIKeyRepository) DeleteAPIKey(ctx context.Context, id uuid.UUID) error {
+func (r *APIKeyRepository) DeleteAPIKey(ctx context.Context, id, userID uuid.UUID) error {
 	query := `
         DELETE FROM api_keys
-        WHERE id = $1
+        WHERE id = $1 AND user_id = $2
     `
-	result, err := r.db.ExecContext(ctx, query, id)
+	result, err := r.db.ExecContext(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}

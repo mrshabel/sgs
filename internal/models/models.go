@@ -74,8 +74,11 @@ type APIKey struct {
 	ProjectID uuid.UUID  `json:"projectId"`
 	UserID    uuid.UUID  `json:"userId"`
 	ExpiresAt time.Time  `json:"expiresAt"`
-	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+	RevokedAt *time.Time `json:"revokedAt"`
 	CreatedAt time.Time  `json:"createdAt"`
+
+	// denormalized project bucket
+	ProjectBucket string `json:"projectBucket,omitempty"`
 }
 
 // DashboardStats represents a summary of the dashboard data

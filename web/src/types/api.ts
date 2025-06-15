@@ -37,6 +37,7 @@ export interface APIKey {
     expiresAt: string;
     revokedAt?: string;
     createdAt: string;
+    projectBucket?: string;
 }
 
 export interface DashboardStats {
@@ -71,6 +72,5 @@ export interface CreateProjectRequest {
 
 export interface CreateAPIKeyRequest {
     name: string;
-    projectId: string;
     expiresAt: string;
 }

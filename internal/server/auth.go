@@ -29,13 +29,15 @@ var (
 
 // AuthHandler provides authentication functionality
 type AuthHandler struct {
-	userRepo *repository.UserRepository
+	userRepo   *repository.UserRepository
+	apiKeyRepo *repository.APIKeyRepository
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
+func NewAuthHandler(userRepo *repository.UserRepository, apiKeyRepo *repository.APIKeyRepository) *AuthHandler {
 	return &AuthHandler{
-		userRepo: userRepo,
+		userRepo:   userRepo,
+		apiKeyRepo: apiKeyRepo,
 	}
 }
 

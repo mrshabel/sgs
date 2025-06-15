@@ -419,14 +419,7 @@ export default function DashboardPage() {
                                                             Created{" "}
                                                             {new Date(
                                                                 project.createdAt
-                                                            ).toLocaleDateString(
-                                                                "en-US",
-                                                                {
-                                                                    month: "short",
-                                                                    day: "numeric",
-                                                                    year: "numeric",
-                                                                }
-                                                            )}
+                                                            ).toUTCString()}
                                                         </p>
                                                     </div>
 
