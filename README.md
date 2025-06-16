@@ -11,6 +11,24 @@ A free, self-hosted object storage solution
 -   🔒 Built-in authentication
 -   🐳 Docker ready
 
+## Preview
+
+### Dashboard
+
+![Dashboard Preview](docs/dashboard.png)
+
+### Project Management
+
+![Projects View](docs/projects.png)
+
+### API Keys
+
+![API Keys Management](docs/api-keys.png)
+
+### File Upload
+
+![File Upload Interface](docs/upload.png)
+
 ## Setup
 
 ```bash

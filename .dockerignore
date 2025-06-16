@@ -1,0 +1,50 @@
+# go development
+tmp/
+vendor/
+*.exe
+*.test
+*.out
+*.prof
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# frontend
+web/node_modules/
+web/dist/
+web/build/
+web/.env
+web/coverage/
+web/npm-debug.log*
+web/yarn-debug.log*
+web/yarn-error.log*
+
+# testing
+**/testdata/
+coverage/
+coverage.txt
+
+# git
+.git/
+.gitignore
+.github/
+
+# documentation
+*.md
+docs/
+
+# docker
+Dockerfile
+docker-compose*.yml
+
+# air configuration
+.air.toml
+tmp/
+
+# binaries
+bin/
