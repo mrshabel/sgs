@@ -32,7 +32,7 @@ docker-build:
 	@docker compose up --build
 
 # view logs
-docker-run:
+docker-logs:
 	@docker compose logs
 
 # run services

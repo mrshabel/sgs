@@ -5,15 +5,17 @@ import (
 	"errors"
 	"mime/multipart"
 	"strconv"
+	"time"
 
-	// "errors"
 	"fmt"
 	"log"
 	"net/http"
+	"sgs/internal/config"
 	"sgs/internal/models"
 	"sgs/internal/repository"
 	"sgs/internal/store"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
@@ -25,14 +27,16 @@ var (
 
 // FileHandler provides functionality for managing a File
 type FileHandler struct {
+	cfg         *config.Config
 	fileRepo    *repository.FileRepository
 	projectRepo *repository.ProjectRepository
 	store       *store.Store
 }
 
 // NewFileHandler creates a new File handler
-func NewFileHandler(fileRepo *repository.FileRepository, projectRepo *repository.ProjectRepository, store *store.Store) *FileHandler {
+func NewFileHandler(cfg *config.Config, fileRepo *repository.FileRepository, projectRepo *repository.ProjectRepository, store *store.Store) *FileHandler {
 	return &FileHandler{
+		cfg:         cfg,
 		fileRepo:    fileRepo,
 		projectRepo: projectRepo,
 		store:       store,
@@ -157,6 +161,147 @@ func (s *FileHandler) DownloadFileHandler(w http.ResponseWriter, r *http.Request
 	if fileMeta.UploadedBy != userID {
 		log.Printf("Denied unauthorized user from accessing private file: %v\n", err)
 		s.sendResponse(w, http.StatusUnauthorized, models.APIResponse{Message: "Failed to download file"})
+		return
+	}
+
+	// retrieve file from store
+	err = s.store.GetObject(r.Context(), *fileMeta.Bucket, fileMeta.ObjectName, w)
+	if err != nil {
+		log.Printf("Failed to copy object to be downloaded into response writer: %v\n", err)
+		s.sendResponse(w, http.StatusInternalServerError, models.APIResponse{Message: "Failed to download file"})
+		return
+	}
+
+	// write the appropriate headers
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", fileMeta.Filename))
+	w.Header().Set("Content-Type", fileMeta.ContentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(fileMeta.Size, 10))
+}
+
+// GenerateSignedURLRequest represents the signed url creation payload
+type GenerateSignedURLRequest struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+type GenerateSignedURLResponse struct {
+	DownloadURL string `json:"downloadUrl"`
+}
+
+// validate register request
+func (data *GenerateSignedURLRequest) validate() error {
+	if data.ExpiresAt.IsZero() {
+		return fmt.Errorf("link expiry is required")
+	}
+
+	if data.ExpiresAt.IsZero() {
+		return fmt.Errorf("expiry time is required")
+	}
+
+	// convert ExpiresAt to UTC for comparison
+	expiresAt := data.ExpiresAt.UTC()
+
+	// current utc time for validation
+	now := time.Now().UTC()
+
+	// check if expiry is in the past
+	if expiresAt.Before(now) {
+		return fmt.Errorf("expiry time must be in the future")
+	}
+
+	// check if expiry is too far in the future: 1 year maximum
+	// maxExpiry := now.AddDate(1, 0, 0)
+	// if expiresAt.After(maxExpiry) {
+	// 	return fmt.Errorf("expiry time cannot be more than 1 year from now")
+	// }
+
+	// check minimum expiry: 5 minutes
+	minExpiry := now.Add(5 * time.Minute)
+	if expiresAt.Before(minExpiry) {
+		return fmt.Errorf("expiry time must be at least 1 hour from now")
+	}
+
+	return nil
+}
+
+// GenerateSignedURLHandler generates a new signed url for a given file
+func (s *FileHandler) GenerateSignedURLHandler(w http.ResponseWriter, r *http.Request) {
+	// get the file id
+	fileID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		s.sendResponse(w, http.StatusUnprocessableEntity, models.APIResponse{Message: "Invalid file ID"})
+		return
+	}
+	// parse the request body
+	var req GenerateSignedURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("Invalid request payload: %v\n", err)
+		s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: "Invalid request payload"})
+		return
+	}
+	// Validate input
+	if err := req.validate(); err != nil {
+		s.sendResponse(w, http.StatusUnprocessableEntity, models.APIResponse{Message: err.Error()})
+		return
+	}
+
+	// retrieve the associated file
+	file, err := s.fileRepo.GetFileByID(r.Context(), fileID)
+	if err != nil {
+		if err == repository.ErrFileNotFound {
+			s.sendResponse(w, http.StatusNotFound, models.APIResponse{Message: err.Error()})
+			return
+		}
+		log.Printf("failed to retrieve file: %v\n", err)
+		s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: "Failed to generate signed url"})
+		return
+	}
+
+	// generate token
+	token, err := s.generateSignedURL(file, req.ExpiresAt)
+	if err != nil {
+		log.Printf("failed to generate signed url: %v\n", err)
+		s.sendResponse(w, http.StatusInternalServerError, models.APIResponse{Message: "Failed to generate signed url"})
+		return
+	}
+
+	// compose url
+	signedURL := s.cfg.BaseURL.JoinPath("/api/files/download-signed")
+	query := signedURL.Query()
+	query.Set("token", token)
+	signedURL.RawQuery = query.Encode()
+
+	s.sendResponse(w, http.StatusCreated, models.APIResponse{Message: "Signed URL generated successfully", Data: GenerateSignedURLResponse{DownloadURL: signedURL.String()}})
+}
+
+func (s *FileHandler) DownloadSignedFileHandler(w http.ResponseWriter, r *http.Request) {
+	// extract token and validate jwt
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		s.sendResponse(w, http.StatusUnauthorized, models.APIResponse{Message: "File not found"})
+		return
+	}
+
+	content, err := s.validateSignedURL(token)
+	if err != nil {
+		if err == jwt.ErrTokenExpired {
+			s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: "File download link is no longer valid. Generate a new one"})
+			return
+		}
+
+		log.Printf("failed to validate presigned url token: %v\n", err)
+		s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: "Invalid download link"})
+		return
+	}
+
+	// retrieve file metadata from store and verify ownership
+	fileMeta, err := s.fileRepo.GetFileByID(r.Context(), content.FileID)
+	if err != nil {
+		if err == repository.ErrFileNotFound {
+			s.sendResponse(w, http.StatusNotFound, models.APIResponse{Message: err.Error()})
+			return
+		}
+		log.Printf("failed to retrieve file: %v\n", err)
+		s.sendResponse(w, http.StatusBadRequest, models.APIResponse{Message: "Failed to download file"})
 		return
 	}
 
@@ -328,4 +473,69 @@ func (s *FileHandler) sendResponse(w http.ResponseWriter, status int, resp model
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(resp)
+}
+
+// signed url helpers
+
+// generateSignedURL creates a new signed url for a given file
+func (s *FileHandler) generateSignedURL(file *models.File, expiresAt time.Time) (string, error) {
+	// set expiration time and claims with timestamps in unix format
+	claims := jwt.MapClaims{
+		"sub":    file.ID.String(),
+		"bucket": file.Bucket,
+		"exp":    expiresAt.Unix(),
+		"iat":    time.Now().Unix(),
+	}
+
+	// generate token with claims
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// sign token with secret key
+	tokenString, err := token.SignedString([]byte(s.cfg.JwtSecret))
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+// validateSignedURL verifies a signedURL token and returns the contents of the signed url. [ErrExpiredToken] is returned if the token
+// has expired or [ErrInvalidToken] if the token validation failed
+func (s *FileHandler) validateSignedURL(tokenString string) (*models.SignedURLContent, error) {
+	// parse the token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Validate the signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+		return []byte(s.cfg.JwtSecret), nil
+	})
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, ErrExpiredToken
+		}
+		return nil, err
+	}
+
+	// extract and validate claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return nil, ErrInvalidToken
+	}
+
+	content := &models.SignedURLContent{}
+	fileID, ok := claims["sub"].(string)
+	if !ok {
+		return nil, ErrInvalidToken
+	}
+	if content.Bucket, ok = claims["bucket"].(string); !ok {
+		return nil, ErrInvalidToken
+	}
+
+	// parse content id
+	content.FileID, err = uuid.Parse(fileID)
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
+	return content, nil
 }

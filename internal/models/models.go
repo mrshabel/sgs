@@ -98,3 +98,20 @@ type APIResponse struct {
 	// optional errors
 	Errors any `json:"errors,omitempty"`
 }
+
+// notifications
+type StoreNotificationEvent string
+
+const (
+	BucketCreated  StoreNotificationEvent = "s3:BucketCreated:*"
+	BucketRemoved  StoreNotificationEvent = "s3:BucketRemoved:*"
+	ObjectCreated  StoreNotificationEvent = "s3:ObjectCreated:*"
+	ObjectAccessed StoreNotificationEvent = "s3:ObjectAccessed:*"
+	ObjectRemoved  StoreNotificationEvent = "s3:ObjectRemoved:*"
+)
+
+// signed url content
+type SignedURLContent struct {
+	FileID uuid.UUID
+	Bucket string
+}

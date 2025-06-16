@@ -2,13 +2,17 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
-	"os"
+	"net/url"
+	"sgs/internal/config"
 	"sgs/internal/models"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/notification"
 )
 
 const (
@@ -17,10 +21,7 @@ const (
 
 // configs
 var (
-	endpoint        = os.Getenv("STORE_ADDR")
-	accessKeyID     = os.Getenv("STORE_USER")
-	secretAccessKey = os.Getenv("STORE_PASSWORD")
-	useSSL          = false
+	useSSL = false
 )
 
 type Store struct {
@@ -28,9 +29,9 @@ type Store struct {
 }
 
 // New sets up a connection to the underlying minio store and initialize a client object. A non-nil error is returned when the connection fails
-func New() (*Store, error) {
-	client, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+func New(cfg *config.Config) (*Store, error) {
+	client, err := minio.New(cfg.StoreAddr, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.StoreUser, cfg.StorePassword, ""),
 		Secure: useSSL,
 	})
 	if err != nil {
@@ -113,4 +114,23 @@ func (s *Store) RemoveIncompleteUploads(ctx context.Context, bucketName, objectN
 
 }
 
-// TODO: add bucket notifications
+// GetNotifications returns a channel containing notifications on all objects in the underlying store
+func (s *Store) GetObjectsNotifications(ctx context.Context, events []models.StoreNotificationEvent) <-chan notification.Info {
+	stringEvents := make([]string, len(events))
+	for i, event := range events {
+		stringEvents[i] = string(event)
+	}
+	return s.client.ListenNotification(ctx, "", "", stringEvents)
+}
+
+// presigned urls
+
+// GenerateTempObjectURL generates a temporal url to access an object without needing to be logged in
+func (s *Store) GenerateTempObjectURL(ctx context.Context, bucket, object, downloadFilename string, expiresAt time.Duration) (*url.URL, error) {
+	// set request parameters for content-disposition.
+	reqParams := make(url.Values)
+	reqParams.Set("response-content-disposition", fmt.Sprintf("attachment; filename=%s", downloadFilename))
+
+	// generate presigned url
+	return s.client.PresignedGetObject(context.Background(), bucket, object, expiresAt, reqParams)
+}

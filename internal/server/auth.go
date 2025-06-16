@@ -6,17 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"sgs/internal/config"
 	"sgs/internal/models"
 	"sgs/internal/repository"
 	"sgs/internal/utils"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-)
-
-var (
-	JwtSecret = os.Getenv("JWT_SECRET")
 )
 
 // errors
@@ -29,13 +25,15 @@ var (
 
 // AuthHandler provides authentication functionality
 type AuthHandler struct {
+	cfg        *config.Config
 	userRepo   *repository.UserRepository
 	apiKeyRepo *repository.APIKeyRepository
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(userRepo *repository.UserRepository, apiKeyRepo *repository.APIKeyRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo *repository.UserRepository, apiKeyRepo *repository.APIKeyRepository) *AuthHandler {
 	return &AuthHandler{
+		cfg:        cfg,
 		userRepo:   userRepo,
 		apiKeyRepo: apiKeyRepo,
 	}
@@ -174,7 +172,7 @@ func (s *AuthHandler) generateAccessToken(user *models.User, ttl time.Duration) 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// sign token with secret key
-	tokenString, err := token.SignedString([]byte(JwtSecret))
+	tokenString, err := token.SignedString([]byte(s.cfg.JwtSecret))
 	if err != nil {
 		return "", err
 	}
@@ -189,7 +187,7 @@ func (s *AuthHandler) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
-		return []byte(JwtSecret), nil
+		return []byte(s.cfg.JwtSecret), nil
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {

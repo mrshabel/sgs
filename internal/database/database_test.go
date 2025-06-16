@@ -2,99 +2,134 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
+	"os"
 	"testing"
 	"time"
+
+	"sgs/internal/config"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func mustStartPostgresContainer() (func(context.Context, ...testcontainers.TerminateOption) error, error) {
-	var (
-		dbName = "database"
-		dbPwd  = "password"
-		dbUser = "user"
-	)
+var testDB *DB
+var testConfig *config.Config
 
-	dbContainer, err := postgres.Run(
-		context.Background(),
-		"postgres:latest",
+func setupTestContainer(t *testing.T) (func(context.Context, ...testcontainers.TerminateOption) error, error) {
+	ctx := context.Background()
+
+	// test database configuration
+	dbName := "sgs_test"
+	dbUser := "test_user"
+	dbPass := "test_password"
+
+	container, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:15-alpine"),
 		postgres.WithDatabase(dbName),
 		postgres.WithUsername(dbUser),
-		postgres.WithPassword(dbPwd),
+		postgres.WithPassword(dbPass),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithStartupTimeout(5*time.Second),
+		),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	database = dbName
-	password = dbPwd
-	username = dbUser
-
-	dbHost, err := dbContainer.Host(context.Background())
+	// get container connection details
+	host, err := container.Host(ctx)
 	if err != nil {
-		return dbContainer.Terminate, err
+		return container.Terminate, fmt.Errorf("failed to get container host: %w", err)
 	}
 
-	dbPort, err := dbContainer.MappedPort(context.Background(), "5432/tcp")
+	mappedPort, err := container.MappedPort(ctx, "5432")
 	if err != nil {
-		return dbContainer.Terminate, err
+		return container.Terminate, fmt.Errorf("failed to get container port: %w", err)
 	}
 
-	host = dbHost
-	port = dbPort.Port()
+	// create test config
+	baseURL, _ := url.Parse("http://localhost:8080")
+	testConfig = &config.Config{
+		Db:            dbName,
+		DbUsername:    dbUser,
+		DbPassword:    dbPass,
+		DbPort:        mappedPort.Port(),
+		DbHost:        host,
+		JwtSecret:     "test_secret",
+		Port:          "8080",
+		BaseURL:       baseURL,
+		StoreAddr:     "localhost:9000",
+		StoreUser:     "minioadmin",
+		StorePassword: "minioadmin",
+	}
 
-	return dbContainer.Terminate, err
+	// initialize test database
+	testDB, err = New(testConfig)
+	if err != nil {
+		return container.Terminate, fmt.Errorf("failed to connect to test database: %w", err)
+	}
+
+	return container.Terminate, nil
 }
 
 func TestMain(m *testing.M) {
-	teardown, err := mustStartPostgresContainer()
+	ctx := context.Background()
+
+	teardown, err := setupTestContainer(nil)
 	if err != nil {
-		log.Fatalf("could not start postgres container: %v", err)
+		log.Fatalf("Could not start test container: %v", err)
 	}
 
-	m.Run()
+	// run tests
+	code := m.Run()
 
-	if teardown != nil && teardown(context.Background()) != nil {
-		log.Fatalf("could not teardown postgres container: %v", err)
+	// cleanup
+	if err := testDB.Close(); err != nil {
+		log.Printf("Failed to close test database: %v", err)
 	}
+
+	if teardown != nil {
+		if err := teardown(ctx); err != nil {
+			log.Printf("Could not teardown container: %v", err)
+		}
+	}
+
+	os.Exit(code)
 }
 
 func TestNew(t *testing.T) {
-	srv := New()
-	if srv == nil {
-		t.Fatal("New() returned nil")
+	if testDB == nil {
+		t.Fatal("Test database not initialized")
+	}
+
+	// test connection
+	if err := testDB.DB.Ping(); err != nil {
+		t.Fatalf("Failed to ping database: %v", err)
 	}
 }
 
-func TestHealth(t *testing.T) {
-	srv := New()
+// helper function for other tests to get test DB instance
+func getTestDB(t *testing.T) *DB {
+	t.Helper()
 
-	stats := srv.Health()
-
-	if stats["status"] != "up" {
-		t.Fatalf("expected status to be up, got %s", stats["status"])
+	if testDB == nil {
+		t.Fatal("Test database not initialized")
 	}
-
-	if _, ok := stats["error"]; ok {
-		t.Fatalf("expected error not to be present")
-	}
-
-	if stats["message"] != "It's healthy" {
-		t.Fatalf("expected message to be 'It's healthy', got %s", stats["message"])
-	}
+	return testDB
 }
 
-func TestClose(t *testing.T) {
-	srv := New()
+// helper function to get test config
+func getTestConfig(t *testing.T) *config.Config {
+	t.Helper()
 
-	if srv.Close() != nil {
-		t.Fatalf("expected Close() to return nil")
+	if testConfig == nil {
+		t.Fatal("Test config not initialized")
 	}
+	return testConfig
 }

@@ -322,34 +322,31 @@ class APIClient {
     // File sharing endpoints
     async createShareLink(
         fileId: string,
-        options: { expiresIn?: string; password?: string } = {}
-    ): Promise<
-        APIResponse<{ url: string; expiresAt: string; shareId: string }>
-    > {
+        expiresAt: string
+    ): Promise<APIResponse<{ downloadUrl: string }>> {
         try {
-            const response = await this.client.post(
-                `/files/${fileId}/share`,
-                options
-            );
+            const response = await this.client.post(`/files/${fileId}/share`, {
+                expiresAt,
+            });
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to create share link");
         }
     }
 
-    async revokeShareLink(
-        fileId: string,
-        shareId: string
-    ): Promise<APIResponse<void>> {
-        try {
-            const response = await this.client.delete(
-                `/files/${fileId}/share/${shareId}`
-            );
-            return response.data;
-        } catch (error) {
-            throw this.handleError(error, "Failed to revoke share link");
-        }
-    }
+    // async revokeShareLink(
+    //     fileId: string,
+    //     shareId: string
+    // ): Promise<APIResponse<void>> {
+    //     try {
+    //         const response = await this.client.delete(
+    //             `/files/${fileId}/share/${shareId}`
+    //         );
+    //         return response.data;
+    //     } catch (error) {
+    //         throw this.handleError(error, "Failed to revoke share link");
+    //     }
+    // }
 
     // API Key endpoints
     async getAPIKeys(): Promise<APIResponse<APIKey[]>> {

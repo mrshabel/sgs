@@ -3,41 +3,48 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 
+	"sgs/internal/config"
 	"sgs/internal/database"
 	"sgs/internal/store"
 )
 
 type Server struct {
-	port int
-
+	cfg   *config.Config
 	db    *database.DB
 	store *store.Store
 }
 
 func NewServer() (*http.Server, error) {
-	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	// get config
+	cfg, err := config.New()
+	if err != nil {
+		return nil, err
+	}
+
 	// connect to store
-	store, err := store.New()
+	store, err := store.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	// connect to db
+	db, err := database.New(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	NewServer := &Server{
-		port: port,
-
-		db:    database.New(),
+		cfg:   cfg,
+		db:    db,
 		store: store,
 	}
 
 	// Declare Server config
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", NewServer.port),
+		Addr:         fmt.Sprintf(":%s", cfg.Port),
 		Handler:      NewServer.RegisterRoutes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,

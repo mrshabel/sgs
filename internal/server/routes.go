@@ -20,14 +20,17 @@ func (s *Server) RegisterRoutes() http.Handler {
 	dashboardRepo := repository.NewDashboardRepository(s.db.DB)
 	apiKeyRepo := repository.NewAPIKeyRepository(s.db.DB)
 
-	authHandler := NewAuthHandler(userRepo, apiKeyRepo)
+	authHandler := NewAuthHandler(s.cfg, userRepo, apiKeyRepo)
 	projectHandler := NewProjectHandler(projectRepo, s.store)
-	fileHandler := NewFileHandler(fileRepo, projectRepo, s.store)
+	fileHandler := NewFileHandler(s.cfg, fileRepo, projectRepo, s.store)
 	dashboardHandler := NewDashboardHandler(dashboardRepo)
 	apiKeyHandler := NewAPIKeyHandler(apiKeyRepo)
 
 	// api router
 	r = r.PathPrefix("/api").Subrouter()
+
+	// public routes
+	public := r.NewRoute().Subrouter()
 
 	// protected routes
 	protected := r.NewRoute().Subrouter()
@@ -55,9 +58,12 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// files
 	protected.HandleFunc("/files/me", fileHandler.GetUserFilesMeta).Methods(http.MethodGet)
+	// public signed url route
+	public.HandleFunc("/files/download-signed", fileHandler.DownloadSignedFileHandler).Methods(http.MethodGet)
 	protected.HandleFunc("/files/{id}", fileHandler.GetFileMeta).Methods(http.MethodGet)
 	protected.HandleFunc("/files/{id}", fileHandler.DeleteFile).Methods(http.MethodDelete)
 	protected.HandleFunc("/files/{id}/download", fileHandler.DownloadFileHandler).Methods(http.MethodGet)
+	protected.HandleFunc("/files/{id}/share", fileHandler.GenerateSignedURLHandler).Methods(http.MethodPost)
 
 	// dashboard stats
 	protected.HandleFunc("/dashboard/stats", dashboardHandler.GetDashboardStats).Methods(http.MethodGet)
@@ -69,7 +75,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	protected.HandleFunc("/api-keys/{id}/revoke", apiKeyHandler.RevokeAPIKey).Methods(http.MethodPatch)
 
 	// Wrap the router with CORS middleware
-
 	return s.corsMiddleware(r)
 }
 

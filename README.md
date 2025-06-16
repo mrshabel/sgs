@@ -4,11 +4,10 @@ A free, self-hosted object storage solution
 
 ## Features
 
--   📁 File organization into projects
+-   📁 Project-based file organization
 -   🔑 API key management
--   🔗 Time-limited share public links through pre-signed urls
--   📤 File upload/download
--   📋 File listing and management
+-   🔗 Pre-signed URLs for time-limited sharing
+-   📤 File operations (upload/download)
 -   🔒 Built-in authentication
 -   🐳 Docker ready
 
@@ -25,7 +24,7 @@ cd sgs
 cp .env.example .env
 
 # start services with Docker
-docker compose up -d
+make docker-run
 ```
 
 Edit the .env file to configure:
@@ -39,16 +38,28 @@ Edit the .env file to configure:
 
 Requirements:
 
--   Go 1.21+
+-   Go 1.23+
 -   Docker
+-   Node.js 20+
 
 ```bash
 # install dependencies
 go mod download
-
-# run tests
-make test
-
-# start development server
 make watch
+
+# Frontend
+cd web
+npm install
+npm run dev
 ```
+
+## Testing
+
+```bash
+make test
+```
+
+## TODO
+
+[] In-App Notifications
+[] File Versioning

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
+	"sgs/internal/config"
 	"strconv"
 	"time"
 
@@ -29,29 +29,23 @@ type DB struct {
 }
 
 var (
-	database   = os.Getenv("DB_DATABASE")
-	password   = os.Getenv("DB_PASSWORD")
-	username   = os.Getenv("DB_USERNAME")
-	port       = os.Getenv("DB_PORT")
-	host       = os.Getenv("DB_HOST")
 	dbInstance *DB
 )
 
-func New() *DB {
-	// Reuse Connection
+func New(cfg *config.Config) (*DB, error) {
+	// reuse Connection
 	if dbInstance != nil {
-		return dbInstance
+		return dbInstance, nil
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", cfg.DbUsername, cfg.DbPassword, cfg.DbHost, cfg.DbPort, cfg.Db)
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	// ping the database
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
 	log.Println("database connected successfully")
 
 	// run simple migration
@@ -64,7 +58,7 @@ func New() *DB {
 	dbInstance = &DB{
 		db,
 	}
-	return dbInstance
+	return dbInstance, nil
 }
 
 // Health checks the health of the database connection by pinging the database.
@@ -123,6 +117,6 @@ func (s *DB) Health() map[string]string {
 // If the connection is successfully closed, it returns nil.
 // If an error occurs while closing the connection, it returns the error.
 func (s *DB) Close() error {
-	log.Printf("Disconnected from database: %s", database)
+	log.Println("Disconnected from database")
 	return s.DB.Close()
 }

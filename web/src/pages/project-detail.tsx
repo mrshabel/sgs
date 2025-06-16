@@ -42,7 +42,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { ProtectedRoute } from "@/components/protected";
 import { FileUpload } from "@/components/file-upload";
-import { ShareModal } from "@/components/share-modal";
+import { ShareModal } from "@/components/share-file-modal";
 import { apiClient } from "@/lib/api";
 import type { Project, AppFile } from "@/types/api";
 import { toast } from "sonner";
