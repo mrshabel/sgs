@@ -1,6 +1,6 @@
 # SGS
 
-A free, self-hosted object storage solution
+A free, self-hosted object storage solution. View the online documentation [here](https://documenter.getpostman.com/view/37741623/2sB34Zs5Bo "sgs documentation")
 
 ## Features
 

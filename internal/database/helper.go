@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	migrationFilePath = "./internal/database/init.sql"
+	migrationFilePath = "./db/init.sql"
 )
 
 func migrate(db *sql.DB) error {

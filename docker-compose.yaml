@@ -37,6 +37,11 @@ services:
             DB_DATABASE: ${DB_DATABASE}
             DB_USERNAME: ${DB_USERNAME}
             DB_PASSWORD: ${DB_PASSWORD}
+            STORE_ADDR: ${STORE_ADDR}
+            STORE_USER: ${STORE_USER}
+            STORE_PASSWORD: ${STORE_PASSWORD}
+            JWT_SECRET: ${JWT_SECRET}
+            BASE_URL: ${BASE_URL}
         depends_on:
             db:
                 condition: service_healthy
@@ -50,11 +55,17 @@ services:
             context: .
             dockerfile: Dockerfile
             target: web
+            # build args for vite env
+            args:
+                VITE_API_URL: ${VITE_API_URL}
         restart: unless-stopped
         depends_on:
             - api
         ports:
             - 5173:5173
+        # env_file: .env.web
+        environment:
+            VITE_API_URL: ${VITE_API_URL}
         networks:
             - sgs
     db:

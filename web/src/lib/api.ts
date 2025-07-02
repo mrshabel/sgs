@@ -158,6 +158,7 @@ class APIClient {
     ): Promise<APIResponse<Project>> {
         try {
             const response = await this.client.post("/projects", data);
+            console.log("api url", import.meta.env.VITE_API_URL);
             return response.data;
         } catch (error) {
             throw this.handleError(error, "Failed to create project");
